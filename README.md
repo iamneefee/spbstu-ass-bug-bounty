@@ -1,2 +1,1 @@
-# spbstu-ass-bug-bounty
-Architecture of Software Systems | Big bounty platforn
+# Business Domain: A Bug Bounty Platform
