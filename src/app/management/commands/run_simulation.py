@@ -6,11 +6,11 @@ from ...simulation import Simulation
 class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--mode', choices=['step', 'auto'], default='step')
-        parser.add_argument('--lambda', type=float, default=0.6)
-        parser.add_argument('--duration', type=float, default=20.0)
+        parser.add_argument('--lambda', type=float, default=1)
+        parser.add_argument('--duration', type=float, default=30.0)
         parser.add_argument('--delta', type=float, default=0.5)
-        parser.add_argument('--buffer-size', type=int, default=8)
-        parser.add_argument('--operators', type=int, default=3)
+        parser.add_argument('--buffer-size', type=int, default=3)
+        parser.add_argument('--operators', type=int, default=2)
 
     def handle(self, *args, **opts):
         mode = opts['mode']

@@ -10,7 +10,7 @@ class Simulation:
         self.delta = delta
 
         self.buffer = Buffer(size=buffer_size)
-        self.devices = [Device(name=f"O{i + 1}") for i in range(num_devices)]
+        self.devices = [Device(name=f"{i + 1}") for i in range(num_devices)]
 
         self.clock = 0.0
         self.generated = 0
@@ -65,7 +65,7 @@ class Simulation:
                         self.completed += 1
                         self.completed_reports.append(t)
 
-                    events.append(f"start@{device.name}")
+                    events.append(f"start#{device.name}")
 
         return events
 
@@ -77,7 +77,7 @@ class Simulation:
         return events
 
     def buffer_state(self):
-        return f"{len(self.buffer.queue)} -> {[r.priority for r in self.buffer.queue]}"
+        return f"{len(self.buffer.queue)}: {[r.priority for r in self.buffer.queue]}"
 
     def devices_state(self):
         return "; ".join(
