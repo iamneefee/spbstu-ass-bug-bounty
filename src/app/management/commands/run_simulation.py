@@ -28,7 +28,7 @@ class Command(BaseCommand):
             self.run_auto_mode(sim)
 
     def run_step_mode(self, sim: Simulation):
-        print(f"{'t':>6} | Events{' ' * 54} | Buffer{' ' * 9} | Operators{' ' * 31} | %rej")
+        print(f"{'t':>6} | Events{' ' * 54} | Buffer{' ' * 31} | Operators{' ' * 31} | %rej")
         print("-" * 140)
 
         while sim.clock < sim.duration:
@@ -36,7 +36,7 @@ class Command(BaseCommand):
             print(
                 f"{sim.clock:6.2f} | "
                 f"{'; '.join(events):60} | "
-                f"{sim.buffer_state():15} | "
+                f"{sim.buffer_state():37} | "
                 f"{sim.devices_state():40} | "
                 f"{sim.rejection_percent():5.2f}"
             )
