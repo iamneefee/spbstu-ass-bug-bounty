@@ -30,6 +30,7 @@ class Simulation:
         self.started = 0
         self.completed_reports = []
         self._report_accumulator = 0.0
+        self.current_device_index = 0
 
     def generate_reports(self):
         events = []
@@ -68,7 +69,18 @@ class Simulation:
     def process_devices(self):
         events = []
 
-        for device in self.devices:
+        if not hasattr(self, 'current_device_index'):
+            self.current_device_index = 0
+
+        checked_devices = 0
+        devices_count = len(self.devices)
+
+        while checked_devices < devices_count:
+            device = self.devices[self.current_device_index]
+
+            self.current_device_index = (self.current_device_index + 1) % devices_count
+            checked_devices += 1
+
             if device.is_free(self.clock):
                 tasks = self.buffer.pull_tasks(device, batch_by_source=True)
                 if tasks:
@@ -87,6 +99,7 @@ class Simulation:
                         task.source.completed_reports.append(task)
 
                     events.append(f"start#{device.name}")
+                    break
 
         return events
 
