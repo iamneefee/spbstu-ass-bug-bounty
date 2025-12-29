@@ -1,16 +1,27 @@
 from random import uniform
 
-from .models import Buffer, Device, Report
+from .models import Buffer, Device, Report, Source
 
 
 class Simulation:
-    def __init__(self, lambda_rate, duration, delta, buffer_size, num_devices):
+    def __init__(self, lambda_rate, duration, delta, buffer_size, num_devices, num_sources):
         self.lambda_rate = lambda_rate
         self.duration = duration
         self.delta = delta
 
+        self.sources = [Source(name=f"S{i + 1}") for i in range(num_sources)]
+
+        for source in self.sources:
+            source.generated_count = 0
+            source.rejected_count = 0
+            source.completed_reports = []
+
         self.buffer = Buffer(size=buffer_size)
-        self.devices = [Device(name=f"{i + 1}") for i in range(num_devices)]
+        self.devices = [Device(name=f"D{i + 1}") for i in range(num_devices)]
+
+        for device in self.devices:
+            device.total_busy_time = 0.0
+            device.processed_count = 0
 
         self.clock = 0.0
         self.generated = 0
@@ -19,6 +30,7 @@ class Simulation:
         self.started = 0
         self.completed_reports = []
         self._report_accumulator = 0.0
+        self.current_device_index = 0
 
     def generate_reports(self):
         events = []
@@ -27,22 +39,29 @@ class Simulation:
         self._report_accumulator -= n_new
 
         for _ in range(n_new):
+            source = self.sources[int(uniform(0, len(self.sources)))]
+
             report = Report(
-                researcher_name=f"S{int(uniform(1, 5))}",
+                source=source,
                 priority=int(uniform(1, 5)),
             )
             report.submitted_time = self.clock
+
+            source.generated_count += 1
 
             self.generated += 1
             successful, replaced = self.buffer.enqueue(report)
 
             if successful:
                 if replaced:
+                    replaced.source.rejected_count += 1
+                    self.rejected += 1
                     events.append(f"replace#{self.buffer.queue.index(report)}")
                 else:
                     events.append(f"gen#{self.generated - 1}")
             else:
                 self.rejected += 1
+                source.rejected_count += 1
                 events.append(f"rej#{self.generated - 1}")
 
         return events
@@ -50,22 +69,37 @@ class Simulation:
     def process_devices(self):
         events = []
 
-        for device in self.devices:
+        if not hasattr(self, 'current_device_index'):
+            self.current_device_index = 0
+
+        checked_devices = 0
+        devices_count = len(self.devices)
+
+        while checked_devices < devices_count:
+            device = self.devices[self.current_device_index]
+
+            self.current_device_index = (self.current_device_index + 1) % devices_count
+            checked_devices += 1
+
             if device.is_free(self.clock):
-                tasks = self.buffer.pull_tasks(device)
+                tasks = self.buffer.pull_tasks(device, batch_by_source=True)
                 if tasks:
-                    service_time = uniform(1, 5)
+                    service_time = uniform(5, 10)
                     device.busy_until = self.clock + service_time
                     self.started += len(tasks)
 
-                    for t in tasks:
-                        t.status = "done"
-                        t.start_time = self.clock
-                        t.end_time = self.clock + service_time
+                    device.add_busy_time(service_time)
+
+                    for task in tasks:
+                        task.status = "done"
+                        task.start_time = self.clock
+                        task.end_time = self.clock + service_time
                         self.completed += 1
-                        self.completed_reports.append(t)
+                        self.completed_reports.append(task)
+                        task.source.completed_reports.append(task)
 
                     events.append(f"start#{device.name}")
+                    break
 
         return events
 
@@ -100,6 +134,54 @@ class Simulation:
         total_service = sum(r.end_time - r.start_time for r in self.completed_reports)
         return total_service / len(self.completed_reports)
 
+    def source_statistics(self):
+        stats = []
+        for source in self.sources:
+            generated = source.generated_count
+            rejected = source.rejected_count
+            completed = len(source.completed_reports)
+            rejection_pct = (rejected / generated * 100) if generated > 0 else 0.0
+
+            if source.completed_reports:
+                avg_wait = sum(
+                    r.start_time - r.submitted_time for r in source.completed_reports
+                ) / len(source.completed_reports)
+            else:
+                avg_wait = 0.0
+
+            if source.completed_reports:
+                avg_service = sum(
+                    r.end_time - r.start_time for r in source.completed_reports
+                ) / len(source.completed_reports)
+            else:
+                avg_service = 0.0
+
+            stats.append({
+                'source': source.name,
+                'generated': generated,
+                'rejected': rejected,
+                'completed': completed,
+                'rejection_percent': rejection_pct,
+                'avg_waiting_time': avg_wait,
+                'avg_service_time': avg_service,
+            })
+        return stats
+
+    def device_statistics(self):
+        stats = []
+        for device in self.devices:
+            busy_time = device.total_busy_time
+            utilization = (busy_time / self.clock * 100) if self.clock > 0 else 0.0
+            utilization = 100 if utilization > 100 else utilization
+
+            stats.append({
+                'device': device.name,
+                'total_busy_time': busy_time,
+                'processed_count': device.processed_count,
+                'utilization_percent': utilization,
+            })
+        return stats
+
     def summary(self):
         return {
             "generated": self.generated,
@@ -107,4 +189,6 @@ class Simulation:
             "completed": self.completed,
             "rejected": self.rejected,
             "rejection_percent": self.rejection_percent(),
+            "sources": self.source_statistics(),
+            "devices": self.device_statistics(),
         }
